@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PicoW BLE Manager</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 12px; display: flex; justify-content: center; margin: 0; }
+.card { background: white; width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
+.tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+.tab-btn { flex:1; padding:12px; border:none; background:transparent; font-weight:bold; font-size:14px; cursor:pointer; color:#888; transition:all .2s; }
+.tab-btn.active { color:#007bff; background:white; border-bottom:2px solid #007bff; }
+.tab-content { display:none; padding:12px; }
+.tab-content.active { display:block; }
+.ble-bar { display:flex; align-items:center; gap:8px; padding:10px 16px; background:#f8f9fa; border-bottom:1px solid #eee; }
+.ble-dot { width:10px; height:10px; border-radius:50%; background:#dc3545; flex-shrink:0; }
+.ble-dot.ok { background:#28a745; }
+.ble-bar span { font-size:13px; color:#555; flex:1; }
+button { padding:7px 14px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:12px; transition:opacity .2s; }
+button:active { opacity:.7; }
+.btn-pri { background:#007bff; color:white; }
+.btn-suc { background:#28a745; color:white; }
+.btn-dan { background:#dc3545; color:white; }
+.btn-out { background:white; border:1.5px solid #007bff; color:#007bff; }
+.btn-warn { background:#ffc107; color:#333; }
+.btn-full { width:100%; }
+.btn-sm { padding:5px 10px; font-size:11px; }
+input { width:100%; padding:8px; margin:3px 0; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; font-size:13px; }
+h3 { font-size:13px; color:#555; margin:12px 0 6px; letter-spacing:1px; }
+
+/* wifi card */
+.wifi-card { background:linear-gradient(135deg,#667eea,#764ba2); border-radius:12px; padding:12px; color:white; margin-bottom:8px; }
+.wifi-card .ssid { font-size:17px; font-weight:bold; }
+.wifi-card .ip { font-size:12px; opacity:.85; margin-top:2px; }
+.wifi-card .rd { display:flex; gap:12px; margin-top:6px; }
+.wifi-card .rd>div { flex:1; }
+.wifi-card .rd .lbl { font-size:10px; opacity:.7; }
+.wifi-card .rd .val { font-size:14px; font-weight:bold; }
+.rssi-bars { display:flex; align-items:end; gap:3px; height:16px; margin-top:2px; }
+.rssi-bars .bar { width:5px; background:rgba(255,255,255,.4); border-radius:2px; }
+.rssi-bars .bar.on { background:white; }
+.wifi-card.nc { background:linear-gradient(135deg,#868e96,#495057); }
+
+/* dash grid */
+.dash { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.dash-item { background:#f8f9fa; border-radius:10px; padding:10px; text-align:center; position:relative; overflow:hidden; }
+.dash-item .v { font-size:22px; font-weight:800; line-height:1.2; position:relative; z-index:1; }
+.dash-item .l { font-size:10px; color:#888; margin-top:1px; position:relative; z-index:1; }
+.dash-item .u { font-size:12px; font-weight:400; color:#999; }
+.dash-item .bar { height:4px; background:#e9ecef; border-radius:2px; margin-top:5px; overflow:hidden; position:relative; z-index:1; }
+.dash-item .bar .f { height:100%; border-radius:2px; transition:width .5s; }
+.dash-item .sparkline { position:absolute; bottom:0; left:0; width:100%; height:50%; opacity:0.18; pointer-events:none; }
+.dash-ctrl { grid-column:1/-1; display:flex; gap:6px; align-items:center; padding:4px 0; }
+.led-dot { width:12px; height:12px; border-radius:50%; background:#ccc; flex-shrink:0; }
+.led-dot.on { background:#ffc107; box-shadow:0 0 8px rgba(255,193,7,.6); }
+/* freq slider */
+.freq-row { grid-column:1/-1; display:flex; align-items:center; gap:8px; padding:4px 0; font-size:12px; color:#555; }
+.freq-row input[type=range] { flex:1; accent-color:#007bff; }
+
+/* mqtt */
+.mqtt-card { background:#f0f4ff; border:1px solid #cce5ff; border-radius:10px; padding:10px; margin-top:8px; }
+.mqtt-card .mqtt-stat { display:flex; align-items:center; gap:6px; margin-bottom:6px; font-size:13px; }
+.mqtt-dot { width:8px; height:8px; border-radius:50%; background:#dc3545; }
+.mqtt-dot.ok { background:#28a745; }
+.mqtt-row { display:flex; gap:6px; }
+.mqtt-row input { flex:1; }
+.ssid-tag { display:inline-block; background:#e7f3ff; color:#007bff; padding:5px 12px; border-radius:20px; margin:3px; font-size:12px; cursor:pointer; }
+#log { font-family:monospace; font-size:11px; background:#222; color:#adff2f; padding:8px; border-radius:8px; height:140px; overflow-y:auto; margin-top:8px; }
+#wifi-msg { text-align:center; font-size:12px; color:#666; margin:4px 0; }
+.csv-progress { display:none; align-items:center; gap:6px; margin:4px 0; font-size:11px; color:#666; }
+.csv-progress.show { display:flex; }
+.csv-progress .bar { flex:1; height:6px; background:#e9ecef; border-radius:3px; overflow:hidden; }
+.csv-progress .bar .f { height:100%; width:0; background:#007bff; border-radius:3px; transition:width .2s; }
+.csv-progress .pct { white-space:nowrap; min-width:32px; text-align:right; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="ble-bar">
+    <div class="ble-dot" id="ble-dot"></div>
+    <span id="ble-text">尚未連線</span>
+    <button class="btn-pri btn-sm" onclick="connect()">連線</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('wifi',this)">WiFi</button>
+    <button class="tab-btn" onclick="switchTab('device',this)">設備資訊</button>
+  </div>
+
+  <!-- TAB 1: WiFi + MQTT -->
+  <div class="tab-content active" id="tab-wifi">
+    <div class="wifi-card nc" id="wifi-card">
+      <div class="ssid" id="wi-ssid">未連線</div>
+      <div class="ip" id="wi-ip">--</div>
+      <div class="rd">
+        <div><div class="lbl">閘道</div><div class="val" id="wi-gw">--</div></div>
+        <div><div class="lbl">訊號</div><div class="rssi-bars" id="wi-rssi">
+          <div class="bar" style="height:4px"></div>
+          <div class="bar" style="height:8px"></div>
+          <div class="bar" style="height:12px"></div>
+          <div class="bar" style="height:16px"></div>
+          <div class="bar" style="height:20px"></div>
+          <span id="wi-rssi-val" style="font-size:12px;font-weight:bold;margin-left:6px">--</span>
+        </div></div>
+      </div>
+    </div>
+
+    <div id="wifi-msg">點擊掃描搜尋 WiFi</div>
+    <button class="btn-out btn-full" onclick="send('SCAN')">掃描 WiFi</button>
+    <div id="wifi-list" style="margin:4px 0"></div>
+    <input type="text" id="ssid" placeholder="WiFi 名稱">
+    <input type="password" id="pw" placeholder="WiFi 密碼">
+    <button class="btn-suc btn-full" onclick="applyWifi()">連線</button>
+
+    <div class="mqtt-card">
+      <div class="mqtt-stat">
+        <div class="mqtt-dot" id="mqtt-dot"></div>
+        <span id="mqtt-text">MQTT 未連線</span>
+        <button class="btn-out btn-sm" onclick="reloadMqttCfg()" style="margin-left:auto">重載設定</button>
+      </div>
+      <div style="margin-bottom:4px;font-size:11px;color:#888">常用 Broker：
+        <span class="ssid-tag" onclick="setBroker('broker.hivemq.com',1883)">HiveMQ</span>
+        <span class="ssid-tag" onclick="setBroker('broker.emqx.io',1883)">EMQX</span>
+        <span class="ssid-tag" onclick="setBroker('test.mosquitto.org',1883)">Mosquitto</span>
+        <span class="ssid-tag" onclick="setBroker('mqttgo.io',1883)">MQTTGo</span>
+      </div>
+      <div class="mqtt-row">
+        <input type="text" id="mqtt-broker" placeholder="Broker" style="flex:2">
+        <input type="number" id="mqtt-port" placeholder="Port" value="1883" style="flex:1">
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input type="text" id="mqtt-user" placeholder="使用者" style="margin:3px 0;flex:1">
+        <button class="btn-out btn-sm" onclick="genUser()" style="white-space:nowrap">隨機名稱</button>
+      </div>
+      <input type="password" id="mqtt-pw" placeholder="密碼">
+      <input type="text" id="mqtt-topic" placeholder="主題前綴 (ex: picow/data)">
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <button class="btn-suc btn-sm" onclick="mqttConnect()" style="flex:1">連線 MQTT</button>
+        <button class="btn-warn btn-sm" onclick="send('MQTTTEST')" style="flex:1">測試訊息</button>
+        <button class="btn-dan btn-sm" onclick="send('MQTTDIS')" style="flex:1">斷線</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB 2: 設備資訊 -->
+  <div class="tab-content" id="tab-device">
+    <div class="dash">
+      <div class="dash-item" style="color:#e74c3c">
+        <svg class="sparkline" id="spark-temp" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline id="spark-temp-line" fill="none" stroke="#e74c3c" stroke-width="2.5" points=""/></svg>
+        <div class="v"><span id="d-temp">--</span><span class="u">°C</span></div>
+        <div class="l">CPU 溫度</div>
+      </div>
+      <div class="dash-item" style="color:#3498db">
+        <svg class="sparkline" id="spark-freq" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline id="spark-freq-line" fill="none" stroke="#3498db" stroke-width="2.5" points=""/></svg>
+        <div class="v"><span id="d-freq">--</span><span class="u">MHz</span></div>
+        <div class="l">CPU 頻率</div>
+      </div>
+      <div class="dash-item" style="color:#2ecc71">
+        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline id="spark-mem-line" fill="none" stroke="#2ecc71" stroke-width="2.5" points=""/></svg>
+        <div class="v" id="d-mem-pct">--%</div>
+        <div class="l">記憶體</div>
+        <div class="bar"><div class="f" id="d-mem-bar" style="width:0"></div></div>
+      </div>
+      <div class="dash-item" style="color:#9b59b6">
+        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline id="spark-sto-line" fill="none" stroke="#9b59b6" stroke-width="2.5" points=""/></svg>
+        <div class="v" id="d-sto-pct">--%</div>
+        <div class="l">儲存</div>
+        <div class="bar"><div class="f" id="d-sto-bar" style="width:0"></div></div>
+      </div>
+      <div class="dash-item" style="color:#1abc9c">
+        <div class="v" id="d-records">0</div>
+        <div class="l">記錄筆數</div>
+      </div>
+      <div class="dash-item" style="color:#f39c12">
+        <div class="v" id="d-days">0</div>
+        <div class="l">剩餘天數</div>
+      </div>
+      <div style="grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:2px 0">
+        <input type="text" id="dev-id-input" placeholder="裝置 ID（BLE 名稱）" style="flex:1;margin:0">
+        <button class="btn-pri btn-sm" onclick="applyDevId()" style="white-space:nowrap">套用</button>
+      </div>
+      <div class="freq-row">
+        <span>記錄間隔</span>
+        <input type="range" id="period-slider" min="1" max="60" value="5" step="1" oninput="onPeriodSlide(this.value)">
+        <span id="period-label" style="min-width:42px;text-align:right;font-weight:bold">5 秒</span>
+        <button class="btn-pri btn-sm" onclick="applyPeriod()">套用</button>
+      </div>
+      <div class="dash-ctrl">
+        <div class="led-dot" id="led-dot"></div>
+        <button class="btn-suc" onclick="send('1')">LED ON</button>
+        <button class="btn-dan" onclick="send('0')">LED OFF</button>
+        <button class="btn-warn" onclick="send('DELDATA')">清除</button>
+        <button class="btn-pri" onclick="downloadCSV()" style="margin-left:auto">CSV</button>
+      </div>
+      <div class="csv-progress" id="csv-progress">
+        <span>CSV</span>
+        <div class="bar"><div class="f" id="csv-bar"></div></div>
+        <span class="pct" id="csv-pct">0%</span>
+      </div>
+    </div>
+  </div>
+  <div id="log" style="margin:8px 12px 12px">系統日誌<br></div>
+</div>
+
+<script>
+let device, rxChar, txChar, csvBuffer = null, csvData = [], csvTotal = 0, mqttCfgLoaded = false;
+const UART_SERV = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const UUID_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+const UUID_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+
+// sparkline history (max 20 points each)
+const sparkH = { temp:[], freq:[], mem:[], sto:[] };
+const SPARK_MAX = 20;
+
+function pushSpark(key, val) {
+  sparkH[key].push(val);
+  if (sparkH[key].length > SPARK_MAX) sparkH[key].shift();
+  drawSpark(key);
+}
+
+function drawSpark(key) {
+  const data = sparkH[key];
+  if (data.length < 2) return;
+  const lineEl = document.getElementById('spark-' + key + '-line');
+  if (!lineEl) return;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const w = 100, h = 30, pad = 3;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  lineEl.setAttribute('points', pts);
+}
+
+function log(m) {
+  const el = document.getElementById('log');
+  el.innerHTML += '> ' + m + '<br>';
+  el.scrollTop = el.scrollHeight;
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'device') { send('STATUS'); send('DEVINFO'); }
+}
+
+async function connect() {
+  try {
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [UART_SERV] }], optionalServices: []
+    });
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(UART_SERV);
+    rxChar = await service.getCharacteristic(UUID_RX);
+    txChar = await service.getCharacteristic(UUID_TX);
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', onNotify);
+    document.getElementById('ble-dot').classList.add('ok');
+    document.getElementById('ble-text').innerText = '已連接 ' + device.name;
+    log('藍牙配對成功');
+    setTimeout(() => { send('WIFISTATUS'); send('STATUS'); send('DEVINFO'); send('MQTTST'); }, 500);
+  } catch (e) { log('錯誤: ' + e); }
+}
+
+function onNotify(e) {
+  let val = new TextDecoder().decode(e.target.value);
+  if (val.startsWith('SSIDS:')) renderWiFi(val.slice(6).split(','));
+  else if (val.startsWith('MSG:')) document.getElementById('wifi-msg').innerText = val.slice(4);
+  else if (val.startsWith('SUCCESS:')) {
+    document.getElementById('wifi-msg').innerText = '已連網 IP: ' + val.slice(8);
+    setTimeout(() => send('WIFISTATUS'), 300);
+  } else if (val.startsWith('ERR:')) document.getElementById('wifi-msg').innerText = '失敗: ' + val.slice(4);
+  // LED
+  else if (val.startsWith('LED:ON')) document.getElementById('led-dot').classList.add('on');
+  else if (val.startsWith('LED:OFF')) document.getElementById('led-dot').classList.remove('on');
+  // LOG
+  else if (val.startsWith('LOG:STARTED')) log('記錄啟動');
+  else if (val.startsWith('LOG:STOPPED')) log('記錄停止');
+  // Wi-Fi
+  else if (val.startsWith('WISSID:')) { document.getElementById('wi-ssid').innerText = val.slice(7); document.getElementById('wifi-card').classList.remove('nc'); }
+  else if (val.startsWith('WIIP:')) document.getElementById('wi-ip').innerText = val.slice(5);
+  else if (val.startsWith('WIGW:')) document.getElementById('wi-gw').innerText = val.slice(5);
+  else if (val.startsWith('WIRSSI:')) {
+    const rssi = parseInt(val.slice(7)) || -200;
+    document.getElementById('wi-rssi-val').innerText = rssi < -190 ? '--' : rssi + ' dBm';
+    if (rssi < -190) { document.getElementById('wifi-card').className = 'wifi-card nc'; return; }
+    const bars = document.querySelectorAll('#wi-rssi .bar');
+    const level = rssi > -50 ? 5 : rssi > -65 ? 4 : rssi > -75 ? 3 : rssi > -85 ? 2 : 1;
+    bars.forEach((b, i) => b.classList.toggle('on', i < level));
+  }
+  // Device info (split notifications)
+  else if (val.startsWith('DTEMP:')) {
+    const v = parseFloat(val.slice(6));
+    document.getElementById('d-temp').innerText = v.toFixed(1);
+    pushSpark('temp', v);
+  }
+  else if (val.startsWith('DFREQ:')) {
+    const v = parseInt(val.slice(6));
+    document.getElementById('d-freq').innerText = v;
+    pushSpark('freq', v);
+  }
+  else if (val.startsWith('DMEM:')) {
+    const p = val.slice(5).split(',');
+    if (p.length >= 2) {
+      window._memUsed = parseInt(p[0]); window._memFree = parseInt(p[1]);
+      updateMemBar();
+      const total = window._memUsed + window._memFree;
+      if (total) pushSpark('mem', Math.round(window._memUsed / total * 100));
+    }
+  }
+  // Storage
+  else if (val.startsWith('STUSED:')) window._stoUsed = parseInt(val.slice(7));
+  else if (val.startsWith('STMAX:')) {
+    window._stoMax = parseInt(val.slice(6)); updateStoBar();
+    if (window._stoMax) pushSpark('sto', Math.round((window._stoUsed||0) / window._stoMax * 100));
+  }
+  else if (val.startsWith('STREC:')) document.getElementById('d-records').innerText = val.slice(6);
+  else if (val.startsWith('STDAYS:')) document.getElementById('d-days').innerText = val.slice(7);
+  else if (val.startsWith('DELDATA:OK')) { log('數據已清除'); send('STATUS'); }
+  else if (val.startsWith('DELDATA:ERR')) log('清除失敗');
+  else if (val.startsWith('SETPERIOD:OK')) { log('記錄間隔已設為 ' + val.slice(12) + ' 秒'); }
+  else if (val.startsWith('SETPERIOD:ERR')) log('設定失敗');
+  else if (val.startsWith('DEVID:OK:')) { const id = val.slice(9); document.getElementById('dev-id-input').value = id; log('裝置 ID 已更新: ' + id); }
+  else if (val.startsWith('DEVID:ERR')) log('裝置 ID 設定失敗');
+  else if (val.startsWith('DEVID:')) { document.getElementById('dev-id-input').value = val.slice(6); }
+  else if (val.startsWith('MQTT:TEST:OK')) log('MQTT 裝置資訊已發送 ✓');
+  else if (val.startsWith('MQTT:TEST:ERR')) {
+    const reason = val.slice(14);
+    log('MQTT 測試失敗: ' + (reason === 'nc' ? '尚未連線 MQTT' : reason === 'drop' ? '連線已中斷' : reason));
+  }
+  // MQTT
+  else if (val.startsWith('MQTT:OK')) { document.getElementById('mqtt-dot').classList.add('ok'); document.getElementById('mqtt-text').innerText = 'MQTT 已連線'; }
+  else if (val.startsWith('MQTT:STOP')) { document.getElementById('mqtt-dot').classList.remove('ok'); document.getElementById('mqtt-text').innerText = 'MQTT 未連線'; }
+  else if (val.startsWith('MQTT:ERR:')) { document.getElementById('mqtt-dot').classList.remove('ok'); document.getElementById('mqtt-text').innerText = 'MQTT 錯誤: ' + val.slice(9); }
+  else if (val.startsWith('MQTT:ERR')) { document.getElementById('mqtt-dot').classList.remove('ok'); document.getElementById('mqtt-text').innerText = 'MQTT 連線失敗'; }
+  else if (val.startsWith('MQTTCFG:')) {
+    if (!mqttCfgLoaded) {
+      const p = val.slice(8).split(',');
+      if (p.length >= 4) {
+        document.getElementById('mqtt-broker').value = p[0];
+        document.getElementById('mqtt-port').value = p[1];
+        document.getElementById('mqtt-user').value = p[2];
+        document.getElementById('mqtt-topic').value = p[3];
+        mqttCfgLoaded = true;
+      }
+    }
+  }
+  // CSV
+  else if (val.startsWith('CSVSTART:')) {
+    csvBuffer = ''; csvData = [];
+    csvTotal = parseInt(val.slice(9)) || 0;
+    document.getElementById('csv-progress').classList.add('show');
+    updateCsvBar(0);
+  }
+  else if (val.startsWith('CSVD:')) {
+    if (csvBuffer !== null) {
+      csvBuffer += val.slice(5);
+      updateCsvBar(csvBuffer.length);
+    }
+  }
+  else if (val.startsWith('CSVEND')) {
+    csvData = parseCSV(csvBuffer); csvBuffer = null;
+    document.getElementById('csv-progress').classList.remove('show');
+    log('CSV ' + csvData.length + ' 筆');
+  }
+  log('← ' + val.substring(0, 50) + (val.length > 50 ? '…' : ''));
+}
+
+function updateMemBar() {
+  const u = window._memUsed || 0, f = window._memFree || 0, t = u + f;
+  if (!t) return;
+  const p = Math.round(u / t * 100);
+  document.getElementById('d-mem-pct').innerText = p + '%';
+  const bar = document.getElementById('d-mem-bar');
+  bar.style.width = p + '%';
+  bar.style.background = p > 80 ? '#dc3545' : p > 60 ? '#f39c12' : '#2ecc71';
+}
+
+function updateStoBar() {
+  const u = window._stoUsed || 0, m = window._stoMax || 0;
+  if (!m) { document.getElementById('d-sto-pct').innerText = '0%'; document.getElementById('d-sto-bar').style.width = '0'; return; }
+  const p = Math.round(u / m * 100);
+  document.getElementById('d-sto-pct').innerText = p + '%';
+  document.getElementById('d-sto-bar').style.width = p + '%';
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const r = [];
+  for (let i = 1; i < lines.length; i++) {
+    const p = lines[i].split(',');
+    if (p.length >= 3) r.push({ el: parseInt(p[0]), t: parseFloat(p[1]), f: parseInt(p[2]) });
+  }
+  return r;
+}
+
+function updateCsvBar(recv) {
+  const pct = csvTotal ? Math.min(Math.round(recv / csvTotal * 100), 100) : 0;
+  document.getElementById('csv-bar').style.width = pct + '%';
+  document.getElementById('csv-pct').innerText = pct + '%';
+}
+
+function renderWiFi(list) {
+  const el = document.getElementById('wifi-list');
+  el.innerHTML = '';
+  list.forEach(n => { if (!n) return; const s = document.createElement('span'); s.className = 'ssid-tag'; s.innerText = n; s.onclick = () => document.getElementById('ssid').value = n; el.appendChild(s); });
+}
+
+async function send(msg) {
+  if (!rxChar) return;
+  const CHUNK_SIZE = 18;
+  try {
+    for (let i = 0; i < msg.length; i += CHUNK_SIZE) {
+      await rxChar.writeValue(new TextEncoder().encode(msg.substring(i, i + CHUNK_SIZE)));
+      await new Promise(r => setTimeout(r, 60));
+    }
+    await rxChar.writeValue(new TextEncoder().encode('END'));
+  } catch (e) { log('傳送錯誤: ' + e); }
+}
+
+function applyWifi() {
+  const s = document.getElementById('ssid').value, p = document.getElementById('pw').value;
+  if (s && p) { document.getElementById('wifi-msg').innerText = '連線中...'; send('W:' + s + ',' + p); }
+  else alert('請輸入名稱與密碼');
+}
+
+function setBroker(host, port) {
+  document.getElementById('mqtt-broker').value = host;
+  document.getElementById('mqtt-port').value = port;
+}
+
+function genUser() {
+  const adj = ['swift','bright','calm','cool','dark','fast','glad','keen','mild','neat','pure','safe','warm','wise'];
+  const noun = ['pico','node','edge','link','hub','gate','core','wave','beam','cloud'];
+  const n = Math.floor(Math.random() * 900) + 100;
+  document.getElementById('mqtt-user').value = adj[Math.floor(Math.random()*adj.length)] + '_' + noun[Math.floor(Math.random()*noun.length)] + '_' + n;
+}
+
+function reloadMqttCfg() {
+  mqttCfgLoaded = false;
+  send('MQTTST');
+}
+
+function onPeriodSlide(v) {
+  document.getElementById('period-label').innerText = v + ' 秒';
+}
+
+function applyDevId() {
+  const v = document.getElementById('dev-id-input').value.trim();
+  if (!v) return alert('請輸入裝置 ID');
+  send('SETDEVID:' + v);
+}
+
+function applyPeriod() {
+  const v = document.getElementById('period-slider').value;
+  send('SETPERIOD:' + v);
+}
+
+function mqttConnect() {
+  const b = document.getElementById('mqtt-broker').value;
+  const p = document.getElementById('mqtt-port').value || '1883';
+  const u = document.getElementById('mqtt-user').value;
+  const pw = document.getElementById('mqtt-pw').value;
+  const t = document.getElementById('mqtt-topic').value;
+  if (!b) return alert('請輸入 Broker 位址');
+  send('MQTTSET:' + b + ',' + p + ',' + u + ',' + pw + ',' + t);
+}
+
+function downloadCSV() {
+  if (csvData.length) doDownload();
+  else { send('CSV'); let n = 0; const iv = setInterval(() => { if (csvData.length || ++n > 60) { clearInterval(iv); setTimeout(doDownload, 300); } }, 500); }
+}
+function doDownload() {
+  if (!csvData.length) return alert('尚無數據');
+  let text = 'elapsed_s,temperature_C,freq_MHz\n';
+  csvData.forEach(d => text += d.el + ',' + d.t.toFixed(2) + ',' + d.f + '\n');
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pico_data.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  log('CSV 已下載');
+}
+
+async function autoRefresh() {
+  if (!txChar) return;
+  await send('WIFISTATUS');
+  await send('STATUS');
+  await send('DEVINFO');
+  await send('MQTTST');
+}
+setInterval(autoRefresh, 4000);
+</script>
+</body>
+</html>
