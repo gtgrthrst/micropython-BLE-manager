@@ -1,54 +1,65 @@
-# BLE WiFi Provisioner for Pico W (阿好伯技術分享)
+# micropython-BLE-manager
 
-這是一個專為 Raspberry Pi Pico W 設計的無線網路配置工具。透過 **Web Bluetooth API**，你不需要安裝任何 App，直接使用瀏覽器就能為你的 IoT 設備設定 WiFi。
+Raspberry Pi Pico W 管理工具，透過 **Web Bluetooth API** 在瀏覽器中直接操作硬體
 
-## 💡 專案亮點
-- **免 App 運作**：基於 Web Bluetooth 技術，開啟網頁即可連線硬體。
-- **分段傳輸協定 (Chunking)**：克服 BLE MTU 限制，支援長 SSID 與複雜密碼傳輸，確保資料不截斷。
-- **自動復歸**：連線資訊自動儲存於 `config.json`，設備重啟後會自動重連。
-- **即時回饋**：網頁端可顯示硬體連線狀態（Connecting / Success / IP Address）。
+**🔗 管理介面：https://gtgrthrst.github.io/micropython-BLE-manager/**
 
-## 🛠️ 硬體準備
-- Raspberry Pi Pico W x1
-- 已安裝 MicroPython 韌體
-- `ble_advertising.py` (必須上傳至 Pico W)
+## 功能
 
-## 📂 檔案結構
-- `main.py`: Pico W 端的核心邏輯（包含 BLE 服務、分段緩衝與 WiFi 連線監控）。
-- `index.html`: 管理端網頁（實作 Web Bluetooth 切片發送邏輯）。
-- `config.json`: (自動產生) 儲存加密後的網路資訊。
+- **WiFi 配置**：掃描熱點、輸入密碼一鍵連線，自動儲存至 `config.json`
+- **MQTT 整合**：設定 Broker / 帳密 / 主題前綴，定期發布裝置資訊 JSON
+- **裝置資訊儀表板**：即時顯示 CPU 溫度、頻率、記憶體、儲存及 SVG 火花圖
+- **資料記錄**：每 N 秒寫入 `data.bin`，可匯出 CSV
+- **裝置 ID**：自訂 BLE 廣播名稱與 MQTT Client ID
 
-## 🚀 快速開始
+## 硬體需求
 
-### 1. 燒錄硬體
-1. 將 `main.py` 與 `ble_advertising.py` 透過 Thonny 存入 Pico W。
-2. 執行後，板載 LED 會待命，藍牙廣播名稱為 `PicoW`。
+- Raspberry Pi Pico W + MicroPython
+- `umqtt.simple` 安裝於 `/lib/umqtt/simple.mpy`
 
-### 2. 開啟網頁
-1. 進入此專案的 GitHub Pages 連結（必須為 HTTPS 環境）。
-2. 點擊 **"連接設備"** 並選擇 `PicoW`。
-3. 點擊 **"掃描 WiFi"** 獲取周邊熱點。
-4. 輸入密碼後點擊 **"設定並連線"**。
+## 檔案結構
 
-## 🔧 技術細節：分段傳輸 (Chunking)
-由於 BLE 預設單次傳輸長度限制（約 20 bytes），本專案實作了簡單的手法：
-- **發送端 (JS)**：將指令每 18 字元切割一次，並在末端附加 `END` 標記。
-- **接收端 (MicroPython)**：利用 `cmd_buffer` 持續累加片段，直到辨識到結束符號才觸發連線邏輯。
+```
+├── main.py              # Pico W 韌體（BLE、DataLogger、MQTT、WiFi）
+├── ble_advertising.py   # BLE 廣播 payload 輔助
+├── index.html           # Web BLE 管理介面（單一 HTML，無外部相依）
+├── README.md
+└── umqtt/
+    └── simple.py        # MQTT 客戶端
+```
 
----
-## 🌐 即時演示 (Live Demo)
+裝置上自動產生：`/config.json`、`/data.bin`
 
-本專案已部署於 GitHub Pages，你可以直接開啟以下連結進行 WiFi 配置：
-https://gtgrthrst.github.io/pico-w-ble-manager/
-*(請使用 Chrome 或 Edge 瀏覽器以支援 Web Bluetooth)*
-📱 iPhone / iOS 使用說明
-由於 iOS 上的 Safari、Chrome 和 Firefox 目前皆「不支援」原生 Web Bluetooth API，iPhone 使用者必須透過特定的瀏覽器 App 才能與你的 Pico W 連線。
-1. 下載專用瀏覽器
-請至 App Store 下載以下其中一款支援藍牙功能的瀏覽器：
-Bluefy (最推薦，免費且穩定)
-WebBLE (付費，功能強大)
+## 快速開始
 
-## 👤 關於作者
-**阿好伯 (Ah-Bo-Bo)**
-技術部落客 / 專業工程師 / 創客
-> 專注於 Homelab、PVE、Docker 與 IoT 實作分享。
+```bash
+mpremote cp main.py :main.py
+mpremote cp ble_advertising.py :ble_advertising.py
+mpremote cp umqtt/simple.py :lib/umqtt/simple.mpy
+mpremote reset
+```
+
+用 Chrome / Edge 開啟 `index.html` 或上方 GitHub Pages 連結。
+
+> iOS 不支援 Web Bluetooth，請使用 [Bluefy](https://apps.apple.com/app/bluefy/id1492822055)。
+
+## BLE 通訊協定
+
+| 命令 | 說明 |
+|---|---|
+| `SCAN` | 掃描 WiFi |
+| `W:<ssid>,<pw>` | 連線 WiFi |
+| `WIFISTATUS` | 查詢 WiFi 狀態 |
+| `DEVINFO` | 查詢裝置資訊（溫度、頻率、記憶體、ID） |
+| `STATUS` | 查詢儲存狀態 |
+| `MQTTSET:<broker>,<port>,<user>,<pw>,<topic>` | 設定並連線 MQTT |
+| `MQTTTEST` | 發送測試訊息 |
+| `SETDEVID:<id>` | 設定裝置 ID |
+| `SETPERIOD:<sec>` | 設定記錄間隔（1–60 秒） |
+| `CSV` | 匯出 CSV |
+| `DELDATA` | 清除記錄 |
+| `1` / `0` | LED ON / OFF |
+
+## 授權
+
+MIT License
