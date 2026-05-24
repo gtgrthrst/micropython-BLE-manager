@@ -8,7 +8,20 @@ import struct
 from micropython import const
 from ble_advertising import advertising_payload
 
-led = machine.Pin("LED", machine.Pin.OUT)
+try:
+    led = machine.Pin("LED", machine.Pin.OUT)
+except ValueError:
+    led = machine.Pin(8, machine.Pin.OUT)
+
+def _read_temp():
+    try:
+        adc = machine.ADC(4)
+        raw = adc.read_u16()
+        volt = raw * 3.3 / 65535
+        t = 27 - (volt - 0.706) / 0.001721
+        return round(t, 1) if -10 < t < 125 else 0.0
+    except:
+        return 0.0
 
 _IRQ_CENTRAL_CONNECT = const(1)
 _IRQ_CENTRAL_DISCONNECT = const(2)
@@ -57,7 +70,10 @@ class DataLogger:
         self.running = True
         self.start_time = time.time()
         self._count_existing()
-        self.timer = machine.Timer(-1)
+        try:
+            self.timer = machine.Timer(-1)
+        except ValueError:
+            self.timer = machine.Timer(0)
         self.timer.init(period=self.period_ms, mode=machine.Timer.PERIODIC, callback=lambda t: self._record())
 
     def set_period(self, seconds):
@@ -79,10 +95,7 @@ class DataLogger:
         if not self.running or self.rec_count >= self.max_records:
             return
         elapsed = int(time.time() - self.start_time)
-        adc = machine.ADC(4)
-        raw = adc.read_u16()
-        volt = raw * 3.3 / 65535
-        temp_c = 27 - (volt - 0.706) / 0.001721
+        temp_c = _read_temp()
         temp_int = int(temp_c * 100)
         freq = machine.freq() // 1000000
         data = struct.pack("<HhH", elapsed, temp_int, freq)
@@ -285,10 +298,7 @@ class DeviceManager:
 
     def report_devinfo(self):
         import gc
-        adc = machine.ADC(4)
-        raw = adc.read_u16()
-        volt = raw * 3.3 / 65535
-        temp_c = round(27 - (volt - 0.706) / 0.001721, 1)
+        temp_c = round(_read_temp(), 1)
         gc.collect()
         freq = machine.freq() // 1000000
         mem_alloc = gc.mem_alloc()
@@ -356,10 +366,7 @@ class DeviceManager:
             return
         try:
             import gc
-            adc = machine.ADC(4)
-            raw = adc.read_u16()
-            volt = raw * 3.3 / 65535
-            temp_c = round(27 - (volt - 0.706) / 0.001721, 1)
+            temp_c = round(_read_temp(), 1)
             gc.collect()
             freq = machine.freq() // 1000000
             mem_alloc = gc.mem_alloc()
